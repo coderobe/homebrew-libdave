@@ -5,6 +5,7 @@ class Libdave < Formula
   sha256 "23827d585a2020e1bfc01f0b999d6db63de6033be38ff43b6e4e3b4067139325"
   license "MIT"
   version "1.1.1"
+  revision 1
   head "https://github.com/discord/libdave.git", branch: "main"
 
   depends_on "cmake" => :build
@@ -37,6 +38,10 @@ class Libdave < Formula
     end
   end
 
+  def post_install
+    rewrite_local_dylib_linkage! if OS.mac?
+  end
+
   def install
     prefix_path = [
       Formula["nlohmann-json"].opt_prefix,
@@ -67,7 +72,7 @@ class Libdave < Formula
     system "cmake", "--build", "build"
     system "cmake", "--install", "build"
 
-    rewrite_local_dylib_linkage!
+    rewrite_local_dylib_linkage! if OS.mac?
   end
 
   test do
