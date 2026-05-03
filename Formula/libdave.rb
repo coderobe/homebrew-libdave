@@ -16,6 +16,27 @@ class Libdave < Formula
     sha256 "7a9d6318627e548903bc65c3dc5a4de4a90290983efea9a49af8561ed3f999f5"
   end
 
+  def rewrite_local_dylib_linkage!
+    dylibs = Dir[lib/"*.dylib"].sort
+    dylib_names = dylibs.map { |path| File.basename(path) }
+
+    dylibs.each do |dylib|
+      system "install_name_tool", "-id", (opt_lib/File.basename(dylib)).to_s, dylib
+    end
+
+    dylibs.each do |dylib|
+      Utils.safe_popen_read("otool", "-L", dylib).lines.drop(1).each do |line|
+        dependency = line.strip.split.first
+        next unless dependency&.start_with?("@rpath/")
+
+        dependency_name = dependency.delete_prefix("@rpath/")
+        next unless dylib_names.include?(dependency_name)
+
+        system "install_name_tool", "-change", dependency, (opt_lib/dependency_name).to_s, dylib
+      end
+    end
+  end
+
   def install
     prefix_path = [
       Formula["nlohmann-json"].opt_prefix,
@@ -45,9 +66,15 @@ class Libdave < Formula
       "-DOPENSSL_ROOT_DIR=#{Formula["openssl@3"].opt_prefix}"
     system "cmake", "--build", "build"
     system "cmake", "--install", "build"
+
+    rewrite_local_dylib_linkage!
   end
 
   test do
+    if OS.mac?
+      system "/usr/bin/ruby", "-e", "require 'fiddle'; Fiddle.dlopen(ARGV.fetch(0))", lib/"libdave.dylib"
+    end
+
     (testpath/"CMakeLists.txt").write <<~CMAKE
       cmake_minimum_required(VERSION 3.20)
       project(libdave_smoke LANGUAGES CXX)
