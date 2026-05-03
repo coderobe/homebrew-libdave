@@ -2,7 +2,7 @@ cmake_minimum_required(VERSION 3.20)
 
 project(
   libdave
-  VERSION 1.0
+  VERSION 1.1.1
   LANGUAGES CXX C
 )
 
@@ -14,7 +14,8 @@ option(ENABLE_SANITIZERS "Enable address and undefined behavior sanitizers" OFF)
 option(INSTALL_VCPKG_LICENSES "Installs license files from vcpkg deps which require it" OFF)
 
 include(CheckCXXCompilerFlag)
-include(CMakeFindDependencyMacro)
+include(CMakePackageConfigHelpers)
+include(GNUInstallDirs)
 
 set(CMAKE_CXX_STANDARD 17)
 set(CMAKE_CXX_STANDARD_REQUIRED ON)
@@ -102,9 +103,10 @@ else()
 endif()
 
 find_package(nlohmann_json REQUIRED)
-find_dependency(MLSPP REQUIRED)
+find_package(MLSPP REQUIRED)
 
 set(CMAKE_STATIC_LIBRARY_PREFIX "")
+set(LIBDAVE_INSTALL_CMAKEDIR "${CMAKE_INSTALL_LIBDIR}/cmake/${PROJECT_NAME}")
 
 SET(LIB_NAME ${PROJECT_NAME})
 file(GLOB_RECURSE LIB_HEADERS CONFIGURE_DEPENDS "${CMAKE_CURRENT_SOURCE_DIR}/src/*.h" "${CMAKE_CURRENT_SOURCE_DIR}/includes/*.h")
@@ -187,13 +189,13 @@ target_include_directories(
   ${LIB_NAME}
   PUBLIC
     $<BUILD_INTERFACE:${PROJECT_SOURCE_DIR}/includes>
-    $<INSTALL_INTERFACE:include>
+    $<INSTALL_INTERFACE:${CMAKE_INSTALL_INCLUDEDIR}>
   PRIVATE
     $<BUILD_INTERFACE:${PROJECT_SOURCE_DIR}/src>
 )
 
-target_link_libraries(${LIB_NAME} PRIVATE OpenSSL::Crypto)
-target_link_libraries(${LIB_NAME} PRIVATE MLSPP::mlspp)
+target_link_libraries(${LIB_NAME} PUBLIC OpenSSL::Crypto)
+target_link_libraries(${LIB_NAME} PUBLIC MLSPP::mlspp)
 
 if (APPLE AND PERSISTENT_KEYS)
   target_link_libraries(${LIB_NAME} PUBLIC "-framework CoreFoundation" "-framework Security")
@@ -201,8 +203,42 @@ endif()
 
 set(CMAKE_SKIP_INSTALL_ALL_DEPENDENCY ON)
 
-install(TARGETS ${LIB_NAME} INCLUDES DESTINATION "include")
-install(DIRECTORY ${PROJECT_SOURCE_DIR}/includes/ DESTINATION "include")
+configure_package_config_file(
+  ${CMAKE_CURRENT_SOURCE_DIR}/cmake/libdaveConfig.cmake.in
+  ${CMAKE_CURRENT_BINARY_DIR}/libdaveConfig.cmake
+  INSTALL_DESTINATION ${LIBDAVE_INSTALL_CMAKEDIR}
+)
+
+write_basic_package_version_file(
+  ${CMAKE_CURRENT_BINARY_DIR}/libdaveConfigVersion.cmake
+  VERSION ${PROJECT_VERSION}
+  COMPATIBILITY SameMajorVersion
+)
+
+install(
+  TARGETS ${LIB_NAME}
+  EXPORT libdave-targets
+  ARCHIVE DESTINATION ${CMAKE_INSTALL_LIBDIR}
+  LIBRARY DESTINATION ${CMAKE_INSTALL_LIBDIR}
+  RUNTIME DESTINATION ${CMAKE_INSTALL_BINDIR}
+  INCLUDES DESTINATION ${CMAKE_INSTALL_INCLUDEDIR}
+)
+
+install(
+  EXPORT libdave-targets
+  NAMESPACE libdave::
+  FILE libdaveTargets.cmake
+  DESTINATION ${LIBDAVE_INSTALL_CMAKEDIR}
+)
+
+install(
+  FILES
+    ${CMAKE_CURRENT_BINARY_DIR}/libdaveConfig.cmake
+    ${CMAKE_CURRENT_BINARY_DIR}/libdaveConfigVersion.cmake
+  DESTINATION ${LIBDAVE_INSTALL_CMAKEDIR}
+)
+
+install(DIRECTORY ${PROJECT_SOURCE_DIR}/includes/ DESTINATION ${CMAKE_INSTALL_INCLUDEDIR})
 
 if (INSTALL_VCPKG_LICENSES)
   set(DEPS_NEEDING_LICENSE mlspp nlohmann-json)

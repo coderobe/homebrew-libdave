@@ -40,6 +40,28 @@ make cclean
 make shared
 ```
 
+### Homebrew (macOS)
+
+Homebrew requires formulae to be installed from a tap. Because this repository
+is named `discord/libdave` rather than `discord/homebrew-libdave`, tap it with
+an explicit URL first:
+```
+brew tap discord/libdave https://github.com/discord/libdave
+brew install --build-from-source discord/libdave/libdave
+```
+
+To install the latest repository head instead of the latest tagged release referenced by the formula, run:
+```
+brew tap discord/libdave https://github.com/discord/libdave
+brew install --build-from-source --HEAD discord/libdave/libdave
+```
+
+The Homebrew install exports a CMake package, so downstream projects can consume libdave with:
+```
+find_package(libdave CONFIG REQUIRED)
+target_link_libraries(your_target PRIVATE libdave::libdave)
+```
+
 ### SSL
 
 By default the library builds with OpenSSL 3, however you can modify `VCPKG_MANIFEST_DIR` in the [Makefile](Makefile) to build with OpenSSL 1.1 or BoringSSL instead.
